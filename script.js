@@ -9,11 +9,19 @@ const siteNav = document.querySelector(".site-nav");
 const navBackdrop = document.querySelector(".nav-backdrop");
 
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const isSmallViewport =
+  window.matchMedia("(max-width: 768px)").matches ||
+  window.matchMedia("(max-height: 900px)").matches;
+const hasLowMemory =
+  typeof navigator.deviceMemory === "number" && navigator.deviceMemory <= 4;
+const isLiteMode = reduceMotion || isSmallViewport || hasLowMemory;
+
+document.body.classList.toggle("is-lite-mode", isLiteMode);
 
 const formatCount = (target) => `${target}${target === 48 ? "h" : "+"}`;
 
 const createParticles = () => {
-  if (!particleField || reduceMotion) {
+  if (!particleField || isLiteMode) {
     return;
   }
 
@@ -145,7 +153,32 @@ const setupMenu = (syncScrollEffects, showHeader) => {
   });
 
   siteNav.querySelectorAll("a").forEach((link) => {
-    link.addEventListener("click", closeMenu);
+    link.addEventListener("click", (event) => {
+      const targetSelector = link.getAttribute("href");
+      const shouldDelayNavigation =
+        window.innerWidth <= 860 &&
+        targetSelector &&
+        targetSelector.startsWith("#");
+
+      if (!shouldDelayNavigation) {
+        closeMenu();
+        return;
+      }
+
+      event.preventDefault();
+      closeMenu();
+
+      window.setTimeout(() => {
+        const target = document.querySelector(targetSelector);
+
+        target?.scrollIntoView({
+          behavior: isLiteMode ? "auto" : "smooth",
+          block: "start",
+        });
+
+        history.replaceState(null, "", targetSelector);
+      }, isLiteMode ? 90 : 170);
+    });
   });
 
   navBackdrop?.addEventListener("click", closeMenu);
@@ -172,7 +205,7 @@ const setupScrollEffects = () => {
   let headerHeight = header ? header.offsetHeight : 0;
 
   const updateParallax = (scrollY) => {
-    if (reduceMotion || !parallaxElements.length) {
+    if (isLiteMode || !parallaxElements.length) {
       return;
     }
 
@@ -254,7 +287,7 @@ const setupScrollEffects = () => {
 };
 
 const setupTilt = () => {
-  if (reduceMotion || !tiltElements.length) {
+  if (isLiteMode || !tiltElements.length) {
     return;
   }
 
