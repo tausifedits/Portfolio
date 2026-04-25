@@ -90,13 +90,16 @@ const setupRevealObserver = () => {
 
   if (revealElements.length) {
     const revealObserver = new IntersectionObserver(
-      (entries) => {
+      (entries, observer) => {
         entries.forEach((entry) => {
-          entry.target.classList.toggle("is-visible", entry.isIntersecting);
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-visible");
+            observer.unobserve(entry.target);
+          }
         });
       },
       {
-        threshold: 0.18,
+        threshold: 0.12,
         rootMargin: "0px 0px -8% 0px",
       }
     );
@@ -324,3 +327,120 @@ const { syncScrollEffects, showHeader } = setupScrollEffects();
 
 setupMenu(syncScrollEffects, showHeader);
 setupTilt();
+
+const setupVideoFeatures = () => {
+  const workCards = document.querySelectorAll(".work-card");
+  
+  workCards.forEach(card => {
+    const video = card.querySelector(".work-video");
+    const progress = card.querySelector(".work-progress span");
+    const previewContainer = card.querySelector(".work-preview");
+    
+    if (video && previewContainer) {
+      const controls = document.createElement("div");
+      controls.className = "video-controls";
+      controls.innerHTML = `
+        <button class="control-btn mute-btn" aria-label="Toggle sound">
+          <svg class="icon-mute" viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>
+          <svg class="icon-unmute" viewBox="0 0 24 24" style="display:none;"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>
+        </button>
+        <button class="control-btn fullscreen-btn" aria-label="Fullscreen">
+          <svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
+        </button>
+      `;
+      previewContainer.appendChild(controls);
+
+      const muteBtn = controls.querySelector(".mute-btn");
+      const fullscreenBtn = controls.querySelector(".fullscreen-btn");
+
+      if (progress) {
+        video.addEventListener("timeupdate", () => {
+          if (video.duration) {
+            const percent = (video.currentTime / video.duration) * 100;
+            progress.style.width = `${percent}%`;
+          }
+        });
+      }
+
+      muteBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        video.muted = !video.muted;
+        const iconMute = muteBtn.querySelector(".icon-mute");
+        const iconUnmute = muteBtn.querySelector(".icon-unmute");
+        if (video.muted) {
+          iconMute.style.display = "block";
+          iconUnmute.style.display = "none";
+        } else {
+          iconMute.style.display = "none";
+          iconUnmute.style.display = "block";
+        }
+      });
+
+      fullscreenBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (video.requestFullscreen) {
+          video.requestFullscreen();
+        } else if (video.webkitRequestFullscreen) {
+          video.webkitRequestFullscreen();
+        } else if (video.msRequestFullscreen) {
+          video.msRequestFullscreen();
+        }
+      });
+
+      card.addEventListener("mouseleave", () => {
+        if (!video.muted) {
+          video.muted = true;
+          const iconMute = muteBtn.querySelector(".icon-mute");
+          const iconUnmute = muteBtn.querySelector(".icon-unmute");
+          if (iconMute) iconMute.style.display = "block";
+          if (iconUnmute) iconUnmute.style.display = "none";
+        }
+      });
+    }
+  });
+};
+
+setupVideoFeatures();
+
+const setupAdaptiveHeader = () => {
+  if (!header || !("IntersectionObserver" in window)) return;
+
+  const sections = document.querySelectorAll("[data-header-color]");
+  if (!sections.length) return;
+
+  // Track which sections are currently intersecting
+  const visibleSections = new Map();
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        const color = entry.target.dataset.headerColor;
+        if (entry.isIntersecting) {
+          visibleSections.set(entry.target, color);
+        } else {
+          visibleSections.delete(entry.target);
+        }
+      });
+
+      // Use the last (lowest on page = most in view) intersecting section
+      let activeColor = null;
+      sections.forEach((section) => {
+        if (visibleSections.has(section)) {
+          activeColor = visibleSections.get(section);
+        }
+      });
+
+      header.style.setProperty("--header-accent", activeColor || "transparent");
+    },
+    {
+      threshold: 0.15,
+      rootMargin: "-60px 0px 0px 0px",
+    }
+  );
+
+  sections.forEach((section) => observer.observe(section));
+};
+
+setupAdaptiveHeader();
