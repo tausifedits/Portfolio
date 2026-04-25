@@ -345,13 +345,40 @@ const setupVideoFeatures = () => {
           <svg class="icon-unmute" viewBox="0 0 24 24" style="display:none;"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>
         </button>
         <button class="control-btn fullscreen-btn" aria-label="Fullscreen">
-          <svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
+          <svg class="icon-expand" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
+          <svg class="icon-shrink" viewBox="0 0 24 24" style="display:none;"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"></path></svg>
         </button>
       `;
       previewContainer.appendChild(controls);
 
       const muteBtn = controls.querySelector(".mute-btn");
       const fullscreenBtn = controls.querySelector(".fullscreen-btn");
+
+      // Sync mute icon state
+      const syncMuteIcon = () => {
+        const iconMute = muteBtn.querySelector(".icon-mute");
+        const iconUnmute = muteBtn.querySelector(".icon-unmute");
+        if (video.muted) {
+          iconMute.style.display = "block";
+          iconUnmute.style.display = "none";
+        } else {
+          iconMute.style.display = "none";
+          iconUnmute.style.display = "block";
+        }
+      };
+
+      // Sync fullscreen icon state
+      const syncFsIcon = (isFs) => {
+        const iconExpand = fullscreenBtn.querySelector(".icon-expand");
+        const iconShrink = fullscreenBtn.querySelector(".icon-shrink");
+        if (isFs) {
+          iconExpand.style.display = "none";
+          iconShrink.style.display = "block";
+        } else {
+          iconExpand.style.display = "block";
+          iconShrink.style.display = "none";
+        }
+      };
 
       if (progress) {
         video.addEventListener("timeupdate", () => {
@@ -366,36 +393,44 @@ const setupVideoFeatures = () => {
         e.preventDefault();
         e.stopPropagation();
         video.muted = !video.muted;
-        const iconMute = muteBtn.querySelector(".icon-mute");
-        const iconUnmute = muteBtn.querySelector(".icon-unmute");
-        if (video.muted) {
-          iconMute.style.display = "block";
-          iconUnmute.style.display = "none";
-        } else {
-          iconMute.style.display = "none";
-          iconUnmute.style.display = "block";
-        }
+        syncMuteIcon();
       });
 
       fullscreenBtn.addEventListener("click", (e) => {
         e.preventDefault();
         e.stopPropagation();
-        if (video.requestFullscreen) {
-          video.requestFullscreen();
-        } else if (video.webkitRequestFullscreen) {
-          video.webkitRequestFullscreen();
-        } else if (video.msRequestFullscreen) {
-          video.msRequestFullscreen();
+        const isFs = document.fullscreenElement === previewContainer
+          || document.webkitFullscreenElement === previewContainer;
+        
+        if (isFs) {
+          // Exit fullscreen
+          if (document.exitFullscreen) document.exitFullscreen();
+          else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+        } else {
+          // Fullscreen the container (not the video) so controls stay visible
+          if (previewContainer.requestFullscreen) {
+            previewContainer.requestFullscreen();
+          } else if (previewContainer.webkitRequestFullscreen) {
+            previewContainer.webkitRequestFullscreen();
+          }
         }
       });
+
+      // Keep controls always visible + toggle icon when fullscreen changes
+      const onFsChange = () => {
+        const isFs = document.fullscreenElement === previewContainer
+          || document.webkitFullscreenElement === previewContainer;
+        controls.style.opacity = isFs ? "1" : "";
+        syncFsIcon(isFs);
+      };
+
+      document.addEventListener("fullscreenchange", onFsChange);
+      document.addEventListener("webkitfullscreenchange", onFsChange);
 
       card.addEventListener("mouseleave", () => {
         if (!video.muted) {
           video.muted = true;
-          const iconMute = muteBtn.querySelector(".icon-mute");
-          const iconUnmute = muteBtn.querySelector(".icon-unmute");
-          if (iconMute) iconMute.style.display = "block";
-          if (iconUnmute) iconUnmute.style.display = "none";
+          syncMuteIcon();
         }
       });
     }
